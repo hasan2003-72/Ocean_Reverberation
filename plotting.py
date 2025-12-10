@@ -318,71 +318,7 @@ def plotte_rir(ax: plt.Axes, rir_daten: List[Dict[str, Any]], params: Dict[str, 
             ax2.plot(fit_x / faktor, fit_y, 'r--', lw=1.5)
 
 
-# def plotte_raum_rir_und_echodichte(valide_pfade, rir_daten, echo_t, echo_density, params, color_map_k):
-#     """
-#     Erstellt das finale Fenster.
-#     VERSION: Ohne theoretische Vergleichskurve (nur Simulation).
-#     """
-#     fig = plt.figure(figsize=(15, 9))
-#     gs = fig.add_gridspec(2, 3, width_ratios=[1.4, 1]) 
-#     ax_freq = fig.add_subplot(gs[0, 2])
-#     ax_raum = fig.add_subplot(gs[:, 0], projection='3d')
-#     ax_rir = fig.add_subplot(gs[0, 1])
-#     ax_echo = fig.add_subplot(gs[1, 1])
 
-#     # 1. Raum & 2. RIR (bleibt alles wie vorher)
-#     plotte_geometrie_3d(ax_raum, valide_pfade, params, color_map_k)
-#     plotte_rir(ax_rir, rir_daten, params, color_map_k)
-#     # 3. FREQUENZGANG (nur wenn FIR benutzt wird)
-#     USE_FIR = params.get("USE_FREQUENCY_DEPENDENT_RIR", False)
-#     rir_signal = params.get("rir", None)
-#     fs = params.get("fs", 192000)
-
-#     if USE_FIR and rir_signal is not None:
-#         plotte_frequenzgang(ax_freq, rir_signal, fs)
-#     else:
-#         ax_freq.set_title("Frequenzgang nur im FIR-Modus")
-#         ax_freq.text(0.5, 0.5, "Nur verfügbar im\nFIR-RIR Modus", ha='center')
-
-#     plotte_frequenzgang(axes[0][2], rir, params["fs"])
-
-#     # --- 3. ECHO-DICHTE (Nur Simulation) ---
-#     unit = params.get('x_unit', 's')
-#     if unit == 'ms':
-#         faktor = 1.0; x_label = "Zeit [ms]"
-#     else:
-#         faktor = 1000.0; x_label = "Zeit [s]"
-
-#     # Titel angepasst (kein "vs. Theorie" mehr)
-#     ax_echo.set_title("Echo-Dichte (Histogramm)", fontsize=11, fontweight='bold')
-#     ax_echo.set_xlabel(x_label)
-    
-#     # Label zeigt die Bin-Breite an (zur Info)
-#     bin_ms = params.get('bin_width_ms', 5.0)
-#     ax_echo.set_ylabel(f"Anzahl Impulse (pro {bin_ms} ms)")
-    
-#     ax_echo.grid(True, ls=':', alpha=0.5)
-    
-#     limit_ms = RIR_TIME_FIXED_MS
-#     ax_echo.set_xlim(0, limit_ms / faktor)
-    
-#     # SIMULATION PLOTTEN
-#     if len(echo_t) > 0:
-#         n = min(len(echo_t), len(echo_density))
-#         t_axis = (echo_t[:n] * 1000.0) / faktor
-        
-#         # Einfache schwarze Kurve / Füllung
-#         ax_echo.fill_between(t_axis, echo_density[:n], color='black', alpha=0.2)
-#         ax_echo.plot(t_axis, echo_density[:n], color='black', lw=1.0, label="Simulation")
-        
-#         # Y-Achse startet bei 0 (Linear)
-#         ax_echo.set_ylim(bottom=0)
-
-#     # Legende ist jetzt klein (nur noch 1 Eintrag)
-#     ax_echo.legend(loc='upper left', fontsize=8)
-
-#     plt.tight_layout()
-#     return fig, (ax_raum, ax_rir, ax_echo)
 
 def plotte_raum_rir_und_echodichte(valide_pfade, rir_daten, rir_array, echo_t, echo_density, params, color_map_k):
     """
@@ -415,64 +351,14 @@ def plotte_raum_rir_und_echodichte(valide_pfade, rir_daten, rir_array, echo_t, e
     ax_wave = fig.add_subplot(gs[0, 1])
     ax_rir_db = fig.add_subplot(gs[1, 1])
     
-    # Spalte 3: Oben Frequenz, Unten Echodichte
-    ax_freq = fig.add_subplot(gs[0, 2])
-    ax_echo = fig.add_subplot(gs[1, 2])
-
     # 1. Raum
     plotte_geometrie_3d(ax_raum, valide_pfade, params, color_map_k)
     
-    # 2. NEU: Lineare Wellenform (Das vergleichst du mit der Messung!)
-    plotte_waveform_linear(ax_wave, rir_array, FS, params) # FS muss importiert sein!
-
     # 3. dB Plot (Logarithmisch)
     plotte_rir(ax_rir_db, rir_daten, params, color_map_k)
 
-    ############
-
-    # --------- 3. FREQUENZGANG (NUR FIR) ---------
-    USE_FIR = params.get("USE_FREQUENCY_DEPENDENT_RIR", False)
-    rir_signal = params.get("rir", None)
-    fs = params.get("fs", 192000)
-
-    if USE_FIR and rir_signal is not None:
-        plotte_frequenzgang(ax_freq, rir_signal, fs)
-    else:
-        ax_freq.set_title("Frequenzgang nur im FIR-Modus")
-        ax_freq.text(0.5, 0.5, "Nur verfügbar im\nFIR-RIR Modus", 
-                     ha='center', va='center', fontsize=11)
-        ax_freq.axis("off")
-
-    # --------- 4. ECHO-DICHTE ---------
-    unit = params.get('x_unit', 's')
-    faktor = 1.0 if unit == 'ms' else 1000.0
-    x_label = "Zeit [ms]" if unit == 'ms' else "Zeit [s]"
-
-    ax_echo.set_title("Echo-Dichte (Histogramm)", fontsize=11, fontweight='bold')
-    ax_echo.set_xlabel(x_label)
-
-    bin_ms = params.get('bin_width_ms', 5.0)
-    ax_echo.set_ylabel(f"Anzahl Impulse (pro {bin_ms} ms)")
-    ax_echo.grid(True, ls=':', alpha=0.5)
-
-    limit_ms = RIR_TIME_FIXED_MS
-    ax_echo.set_xlim(0, limit_ms / faktor)
-    
-    if len(echo_t) > 0:
-        n = min(len(echo_t), len(echo_density))
-        t_axis = (echo_t[:n] * 1000.0) / faktor
-
-        ax_echo.fill_between(t_axis, echo_density[:n], 
-                             color='black', alpha=0.2)
-        ax_echo.plot(t_axis, echo_density[:n], 
-                     color='black', lw=1.0, label="Simulation")
-
-        ax_echo.set_ylim(bottom=0)
-
-    ax_echo.legend(loc='upper left', fontsize=8)
-
     plt.tight_layout()
-    return fig, (ax_raum, ax_wave, ax_rir_db, ax_echo, ax_freq)
+    return fig, (ax_raum, ax_wave, ax_rir_db)
 
 
 def plot_edc_with_t60(zeit_ms, edc_db, t60_ms, x_fit, fit_y):
@@ -497,89 +383,13 @@ def plot_edc_with_t60(zeit_ms, edc_db, t60_ms, x_fit, fit_y):
     plt.grid(True)
     plt.show()
 
-def plotte_frequenzgang(ax, rir, fs):
-    """
-    Plottet den Frequenzgang der RIR.
-    """
-    import numpy as np
 
-    # Zero-Padding für glattere Kurve
-    N = 2**int(np.ceil(np.log2(len(rir))))
-
-    H = np.fft.rfft(rir, n=N)
-    f = np.fft.rfftfreq(N, 1/fs)
-
-    H_db = 20 * np.log10(np.maximum(np.abs(H), 1e-12))
-
-    ax.plot(f, H_db, linewidth=1.0)
-    ax.set_xscale("log")
-    ax.set_title("Frequenzgang der RIR |H(f)|")
-    ax.set_xlabel("Frequenz [Hz]")
-    ax.set_ylabel("Amplitude [dB]")
-    ax.grid(True, which="both", linestyle=":")
 
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import butter, lfilter
 
-def plotte_waveform_linear(ax: plt.Axes, rir_array: np.ndarray, fs: float, params: Dict[str, Any]):
-    """
-    Plottet die Wellenform.
-    SIMULATION: Wir falten mit einem bandbegrenzten Impuls (Sinc).
-    Das entspricht dem idealen Ergebnis einer Messung mit Weißem Rauschen.
-    """
-    
-    # 1. Wir bauen einen "idealen" Mess-Impuls (Bandbegrenzt durch fs)
-    # Ein theoretisch perfekter Dirac ist unendlich kurz. 
-    # Ein gemessener Dirac ist eine "Sinc"-Funktion.
-    
-    # Wir erstellen einen kurzen Impuls von ca. 0.5 ms Länge
-    length_imp = int(0.0005 * fs) * 2  
-    t_imp = np.arange(-length_imp//2, length_imp//2) / fs
-    
-    # Sinc-Funktion (sin(x)/x) -> Das ist der typische "Mess-Peak"
-    # Wir begrenzen ihn z.B. auf 20 kHz (oder deine max Frequenz)
-    cutoff_freq = 20000.0 # Hz
-    mess_impuls = np.sinc(2 * cutoff_freq * t_imp) * np.blackman(len(t_imp))
 
-    # 2. Faltung: RIR * Mess-Impuls
-    measured_signal = np.convolve(rir_array, mess_impuls, mode='full')
-    
-    # Da der Impuls zentriert war, müssen wir den "Lag" korrigieren, 
-    # damit die Zeit 0 wieder stimmt (wir schieben es zurück)
-    shift = len(mess_impuls) // 2
-    measured_signal = measured_signal[shift : shift + len(rir_array)]
-
-    # ---------------------------------------------------------
-    # PLOTTEN
-    # ---------------------------------------------------------
-    t = np.arange(len(measured_signal)) / fs
-    
-    unit = params.get('x_unit', 's')
-    if unit == 'ms':
-        t = t * 1000.0
-        x_label = "Zeit [ms]"
-    else:
-        x_label = "Zeit [s]"
-
-    # Plotten (schwarz, dünn)
-    ax.plot(t, measured_signal, color='black', linewidth=0.6)
-    
-    ax.set_title("Simulierte Messung (Bandbegrenzte RIR)", fontsize=11, fontweight='bold')
-    ax.set_xlabel(x_label)
-    ax.set_ylabel("Amplitude (Linear)")
-    ax.grid(True, alpha=0.5)
-    
-    limit_ms = params.get('rir_time_limit_ms', 100.0)
-    if unit == 'ms':
-        ax.set_xlim(0, limit_ms)
-    else:
-        ax.set_xlim(0, limit_ms / 1000.0)
-
-    # Y-Limits symmetrisch
-    max_val = np.max(np.abs(measured_signal))
-    if max_val > 0:
-        ax.set_ylim(-max_val*1.1, max_val*1.1)
 
 #uboot sonar ähnlich einfach sinus ping 
 # def plotte_waveform_linear(ax: plt.Axes, rir_array: np.ndarray, fs: float, params: Dict[str, Any]):

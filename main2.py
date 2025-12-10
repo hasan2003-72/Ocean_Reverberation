@@ -182,7 +182,7 @@ if __name__ == "__main__":
 
         #np.save("C:\\bachelorarbeit-hasan-yesil\\npy\\rir_meas_tank_5_ord.npy",rir)
         # 4.8 Plot erstellen
-        fig_local, axes = plotte_raum_rir_und_echodichte(
+        fig_local, (ax_raum, ax_wave, ax_rir_db) = plotte_raum_rir_und_echodichte(
             valide_pfade=valide_pfade,
             rir_daten=rir_daten,
             rir_array=rir_array,
