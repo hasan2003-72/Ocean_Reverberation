@@ -223,6 +223,7 @@ def finde_potentielle_quellen(params: Dict[str, Any], alle_reflektoren: List[Pol
                 history=basis_quelle.history + [reflektor_name]
             ))
             
+    print(f"Anzahl potenzieller Quellen: {len(quellen_liste)}")
     return quellen_liste
 
 

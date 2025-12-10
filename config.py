@@ -76,7 +76,7 @@ FREQUENZ_BAND = 48000            # künftig um passende reflexionsfaktoren R(f)
 MAX_ORDNUNG = 7           # höchste refl Ordnung die in ISM generiert 
 AMP_MIN_CUTOFF = 0.005          #Pfade, deren Amplitudenfaktor kleiner als dieser Wert ist, werden verworfen -sehr schwache Echos ignorieren
 FS = 192000 #sampling rate in Hz
-ECHO_DENSITY_BIN_WIDTH_MS = 13 #fensterbreite echodichte in ms
+ECHO_DENSITY_BIN_WIDTH_MS = 3 #fensterbreite echodichte in ms
 
 USE_FREQUENCY_DEPENDENT_RIR = False   # oder False
 MAX_PFAD_ORDNUNG_PLOT = 2           # Plotten der Pfade evtl. maximale Ordnung, die sichtbar sein soll

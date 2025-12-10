@@ -63,7 +63,8 @@ def assign_polygon_color(poly: Polygon):
 # =============================================================================
 def plotte_geometrie_3d(ax: plt.Axes, valide_pfade: List[Path], params: Dict[str, Any], color_map_k: Dict[int, Any]):
     """
-    Zeichnet den 3D-Raum inkl. zwei Legenden (Materialien & Akustik).
+    Zeichnet den 3D-Raum inkl. zwei Legenden (Materialien & Akustik) und der Reflexionspfade.
+    Diese Version ist für die Verwendung mit `Path`-Objekten korrigiert.
     """
     
     # --- A) Setup ---
@@ -71,21 +72,18 @@ def plotte_geometrie_3d(ax: plt.Axes, valide_pfade: List[Path], params: Dict[str
     ax.set_xlabel("X [m]"); ax.set_ylabel("Y [m]"); ax.set_zlabel("Z [m]")
 
     # --- B) Wände zeichnen & Materialien für Legende sammeln ---
-    waende = definiere_waende(params)
+    waende = params.get('alle_reflektoren', [])
     all_coords = []
-    verwendete_materialien = set() # Set verhindert Duplikate in der Legende
+    verwendete_materialien = set()
 
     for wand in waende:
-        assign_polygon_color(wand) # Farbe zuweisen
-        
-        # Namen für Legende merken (z.B. "regupol_fx")
+        assign_polygon_color(wand)
         mat_name = wand.material if wand.material else "Unbekannt"
         verwendete_materialien.add(mat_name)
         
         vertices = wand.vertices
         all_coords.extend(vertices)
 
-        # Wand zeichnen: alpha=0.3 sorgt für Transparenz
         poly = Poly3DCollection([vertices], alpha=0.3, facecolor=wand.color, 
                                 edgecolor=(0.3,0.3,0.3,0.5), linewidth=0.5)
         ax.add_collection3d(poly)
@@ -105,21 +103,27 @@ def plotte_geometrie_3d(ax: plt.Axes, valide_pfade: List[Path], params: Dict[str
     ax.scatter(*params['quelle_pos'], c='red', s=80, marker='*', edgecolors='black', zorder=200)
     ax.scatter(*params['empfaenger_pos'], c='green', s=80, marker='^', edgecolors='black', zorder=200)
 
-    # --- E) Pfade zeichnen (ohne Textlabels) ---
-    pfade_plot = [p for p in valide_pfade if p.image_source.order <= MAX_PFAD_ORDNUNG_PLOT]
-    # Sortieren: Hohe Ordnung zuerst (hinten), Direktschall zuletzt (vorne/oben)
-    pfade_plot.sort(key=lambda p: p.image_source.order, reverse=True)
+    # --- E) Pfade zeichnen (korrigiert für Path-Objekte) ---
+    if valide_pfade:
+        pfade_plot = sorted(valide_pfade, key=lambda p: p.image_source.order, reverse=True)
 
-    for p in pfade_plot:
-        pts = np.array(p.points)
-        k = p.image_source.order
-        
-        c = p.color if p.color else 'black'
-        lw = 2.5 if k == 0 else 1.5  # Direktschall dicker
-        alpha = 1.0 if k == 0 else 0.7
-        
-        ax.plot(pts[:,0], pts[:,1], pts[:,2], color=c, linewidth=lw, alpha=alpha)
+        for pfad in pfade_plot:
+            if pfad.image_source.order > MAX_PFAD_ORDNUNG_PLOT:
+                continue
 
+            punkte = np.array(pfad.points)
+            ordnung = pfad.image_source.order
+
+            if ordnung == 0:
+                farbe = 'darkgreen'
+                linienstaerke = 2.5
+                alpha = 1.0
+            else:
+                farbe = pfad.color if pfad.color else color_map_k.get(ordnung, 'gray')
+                linienstaerke = 1.5
+                alpha = 0.7
+
+            ax.plot(punkte[:, 0], punkte[:, 1], punkte[:, 2], color=farbe, linewidth=linienstaerke, alpha=alpha, zorder=ordnung)
 
     # ==========================================
     # LEGENDE 1: MATERIALIEN (Links Oben)
@@ -127,7 +131,6 @@ def plotte_geometrie_3d(ax: plt.Axes, valide_pfade: List[Path], params: Dict[str
     mat_handles = []
     for mat_name in sorted(list(verwendete_materialien)):
         c = get_material_color(mat_name)
-        # Erstelle ein farbiges Quadrat für die Legende
         patch = mpatches.Patch(color=c, label=mat_name, alpha=0.6)
         mat_handles.append(patch)
     
@@ -135,19 +138,16 @@ def plotte_geometrie_3d(ax: plt.Axes, valide_pfade: List[Path], params: Dict[str
         legend_mat = ax.legend(handles=mat_handles, title="Wand-Materialien", 
                                loc='upper left', fontsize=8, framealpha=0.9,
                                bbox_to_anchor=(0, 1))
-        ax.add_artist(legend_mat) # Wichtig! Fügt Legende hinzu, ohne den Slot für die nächste zu blockieren
+        ax.add_artist(legend_mat)
 
     # ==========================================
     # LEGENDE 2: AKUSTIK (Rechts Oben)
     # ==========================================
     path_handles = []
-    # Symbole für Q und Rx
     path_handles.append(Line2D([0], [0], marker='*', color='w', markerfacecolor='red', markersize=10, label='Quelle'))
     path_handles.append(Line2D([0], [0], marker='^', color='w', markerfacecolor='green', markersize=10, label='Empfänger'))
-    # Linie für Direktschall
     path_handles.append(Line2D([0], [0], color='darkgreen', lw=2.5, label='Direkt (K=0)'))
     
-    # Linien für Reflexionen (nur die ersten paar anzeigen, damit Legende nicht explodiert)
     for k in range(1, min(4, MAX_PFAD_ORDNUNG_PLOT + 1)):
         c_k = color_map_k.get(k, 'gray')
         path_handles.append(Line2D([0], [0], color=c_k, lw=1.5, label=f'Refl. K={k}'))
@@ -159,7 +159,6 @@ def plotte_geometrie_3d(ax: plt.Axes, valide_pfade: List[Path], params: Dict[str
               loc='upper right', fontsize=8, framealpha=0.9,
               bbox_to_anchor=(1, 1))
 
-    # Standard-Ansicht
     ax.view_init(elev=30, azim=-60)
 
 # =
@@ -322,43 +321,52 @@ def plotte_rir(ax: plt.Axes, rir_daten: List[Dict[str, Any]], params: Dict[str, 
 
 def plotte_raum_rir_und_echodichte(valide_pfade, rir_daten, rir_array, echo_t, echo_density, params, color_map_k):
     """
-    Erstellt das finale Fenster inkl. Frequenzgang im FIR-Modus.
-    # """
-    # fig = plt.figure(figsize=(18, 8))
+    Erstellt das finale Fenster mit 3D-Raum, RIR und Echodichte.
+    """
+    # Layout für 3 Spalten
+    fig = plt.figure(figsize=(20, 7)) 
+    gs = fig.add_gridspec(1, 3, width_ratios=[1.2, 1, 1]) 
 
-    # # 2 Zeilen, 3 Spalten → 3 Plots oben, 3 unten
-    # gs = fig.add_gridspec(2, 3, width_ratios=[1.4, 1.0, 1.0])
-
-    # ax_raum = fig.add_subplot(gs[:, 0], projection='3d')
-    # ax_rir  = fig.add_subplot(gs[0, 1])
-    # ax_echo = fig.add_subplot(gs[1, 1])
-    # ax_freq = fig.add_subplot(gs[0, 2])     # <-- NEU
-
-    # # --------- 1. GEOMETRIE ---------
-    # plotte_geometrie_3d(ax_raum, valide_pfade, params, color_map_k)
-
-    # # --------- 2. RIR ---------
-    # plotte_rir(ax_rir, rir_daten, params, color_map_k)
-
-    # Layout breiter machen (3 Spalten)
-    fig = plt.figure(figsize=(18, 8)) 
-    gs = fig.add_gridspec(2, 3, width_ratios=[1.2, 1, 1]) 
-
-    # Spalte 1: Der 3D Raum (groß)
-    ax_raum = fig.add_subplot(gs[:, 0], projection='3d')
+    # Spalte 1: Der 3D Raum
+    ax_raum = fig.add_subplot(gs[0, 0], projection='3d')
     
-    # Spalte 2: Oben Linear (Waveform), Unten dB (Log)
-    ax_wave = fig.add_subplot(gs[0, 1])
-    ax_rir_db = fig.add_subplot(gs[1, 1])
+    # Spalte 2: RIR (dB-Plot)
+    ax_rir_db = fig.add_subplot(gs[0, 1])
     
-    # 1. Raum
+    # Spalte 3: Echodichte
+    ax_echo = fig.add_subplot(gs[0, 2])
+    
+    # 1. Raum zeichnen
     plotte_geometrie_3d(ax_raum, valide_pfade, params, color_map_k)
     
-    # 3. dB Plot (Logarithmisch)
+    # 2. RIR (dB) zeichnen
     plotte_rir(ax_rir_db, rir_daten, params, color_map_k)
 
-    plt.tight_layout()
-    return fig, (ax_raum, ax_wave, ax_rir_db)
+    # 3. Echodichte zeichnen
+    if echo_t is not None and echo_density is not None and len(echo_t) > 0:
+        # Umrechnung der Dichte von "pro ms" zu "pro Sekunde"
+        dichte_pro_sekunde = np.array(echo_density) * 1000.0
+        
+        ax_echo.bar(echo_t, dichte_pro_sekunde, width=ECHO_DENSITY_BIN_WIDTH_MS, color='teal', alpha=0.8, label="Echos pro Sekunde")
+        ax_echo.set_title("Echodichte", fontsize=11, fontweight='bold')
+        ax_echo.set_xlabel("Zeit [ms]")
+        ax_echo.set_ylabel("Anzahl Echos / Sekunde")
+        ax_echo.grid(True, ls=':', alpha=0.6)
+        ax_echo.set_xlim(left=0, right=RIR_TIME_FIXED_MS)
+        ax_echo.set_ylim(bottom=0)
+        
+        # Theoretische Echodichte nach Schroeder
+        V = params.get("volume_m3")
+        if V and V > 0:
+            c = SCHALLGESCHWINDIGKEIT
+            t_schroeder = np.linspace(1, RIR_TIME_FIXED_MS, 200)
+            # Formel: µ(t) = 4 * pi * c^3 * t^2 / V
+            dichte_schroeder = (4 * np.pi * (c**3) * (t_schroeder/1000)**2) / V
+            ax_echo.plot(t_schroeder, dichte_schroeder, color='red', ls='--', lw=2, label="Schroeder (theoretisch)")
+            ax_echo.legend()
+
+    plt.tight_layout(pad=2.0)
+    return fig, (ax_raum, ax_rir_db, ax_echo)
 
 
 def plot_edc_with_t60(zeit_ms, edc_db, t60_ms, x_fit, fit_y):

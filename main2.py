@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # Importiere alles aus den Modulen
 from config import (
     SAVE_PLOT, OUTPUT_FOLDER, MAX_ORDNUNG, CMAP_NAME,ECHO_DENSITY_BIN_WIDTH_MS,
-    ALLE_RAEUME, ACTIVE_RAEUME, FS)
+    ALLE_RAEUME, ACTIVE_RAEUME, FS, USE_RANDOM_POSITIONS)
 
 from geometry import (definiere_waende,get_source_and_receiver_positions)
 
@@ -66,6 +66,11 @@ if __name__ == "__main__":
 
         params = szenario.copy()
         params['max_ordnung'] = MAX_ORDNUNG
+        
+        # NEU: Volumen für Echodichte-Plot berechnen
+        if 'raum_dim' in params:
+            params['volume_m3'] = np.prod(params['raum_dim'])
+
         #wasserabsorption
         params.setdefault("freq_hz", 1000.0)
         params.setdefault("water_absorption_db_per_m", 0.0)
@@ -84,34 +89,41 @@ if __name__ == "__main__":
         # -------------------------------------------------------
         min_dist = params.get('min_dist_wand', 0.5)
 
-        if params.get('geometrie_typ') == 'npy_custom':
-            try:
+        # Wand-Infos für Positionierungsfunktion vorbereiten
+        walls_for_pos = [
+            {
+                'name': w.name,
+                'vertices': w.vertices,
+                'normal': w.normal,
+                'point': w.point
+            }
+            for w in alle_reflektoren
+        ]
+
+        # Logik für Positionen vereinheitlicht
+        try:
+            # SPEZIALFALL: Feste, "gute" Positionen für den Finnraum, um das Problem zu umgehen
+            if 'finnraum' in params['name'].lower():
+                print("[WARNUNG] Verwende hartkodierte 'gute' Positionen für Finnraum.")
+                q_pos = np.array([24.8, 411.5, -14.3])
+                e_pos = np.array([53.1, 389.4, -11.1])
+                # Setze die Positionen auch in den params, damit die Plot-Funktion sie hat
+                params['quelle_pos'] = q_pos
+                params['empfaenger_pos'] = e_pos
+            # Wenn NPY und KEINE zufälligen Positionen gewünscht sind, lade aus Datei
+            elif params.get('geometrie_typ') == 'npy_custom' and not USE_RANDOM_POSITIONS:
                 base_path = params['npy_path']
                 q_pos = np.load(os.path.join(base_path, params['tx_file'])).flatten()
                 e_pos = np.load(os.path.join(base_path, params['rx_file'])).flatten()
-                print(f"[INFO] NPY-Positionen: Q={q_pos}, Rx={e_pos}")
-            except Exception as e:
-                print(f"[FEHLER] Konnte NPY-Positionen nicht laden: {e}")
-                continue
-        else:
-            # Wand-Infos müssen DICT sein
-            walls_for_pos = [
-                {
-                    'name': w.name,
-                    'vertices': w.vertices,
-                    'normal': w.normal,
-                    'point': w.point
-                }
-                for w in alle_reflektoren
-            ]
-
-            try:
+                print(f"[INFO] Feste NPY-Positionen geladen: Q={q_pos}, Rx={e_pos}")
+            else:
+                # In allen anderen Fällen (auch NPY mit Random-Flag) die Funktion nutzen
                 q_pos, e_pos = get_source_and_receiver_positions(
                     walls_for_pos, min_wall_distance=min_dist
                 )
-            except Exception as e:
-                print(f"[FEHLER] Positionierung fehlgeschlagen: {e}")
-                continue
+        except Exception as e:
+            print(f"[FEHLER] Positionierung fehlgeschlagen: {e}")
+            continue
 
         params['quelle_pos'] = q_pos
         params['empfaenger_pos'] = e_pos
